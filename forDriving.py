@@ -4,6 +4,19 @@ import time
 import pigpio
 import serial
 
+#--------------------------------------------------PID------------------------------------------------------------------------
+degree_error = 0
+degree_target = 200
+rate_kp = 0.1
+rate_ki = 0
+rate_kd = 0
+degree_Pterm = 0
+degree_Iterm = 0
+degree_Dterm = 0
+prev_Dterm = 0
+prev_target = 0
+degree_output = 0
+#-----------------------------------------------------------------------------------------------------------------------------
 cap = cv.VideoCapture(0, cv.CAP_V4L2)
 #서보 모터 제어 세팅
 pi = pigpio.pi()
@@ -57,7 +70,7 @@ prevTime = time.time()
 running_degree = 1500 #각도 초기값 세팅
 
 while(True):
-    pi.set_servo_pulsewidth(servo_pin, running_degree)
+    pi.set_servo_pulsewidth(servo_pin, running_degree+degree_output)
     ret , img_color = cap.read() #비디오의 한 프레임씩 읽음 제대로 프레임을 읽으면 ret값이 True, 실패하면 False, fram에 읽은 프레임이 나옵니다
     #print("time1 :", time.time()-teststart)
     teststart= time.time()
@@ -132,8 +145,20 @@ while(True):
                 dist = 0
             send_dist = int(dist)
             
-            if(running_degree <=2400 and running_degree >=600 and gPos != 'C'):
-                running_degree -= (centerX-(screen_width/2))/screen_width*degreeConst
+            if(running_degree <=2400 and running_degree >=600):
+                degree_error = degree_target - centerX
+
+                degree_Pterm = rate_kp * degree_error
+                degree_Iterm += rate_ki * degree_error * (1/30)
+                degree_Dterm = -((centerX - prev_target)/(1/30)) * rate_kd
+
+                degree_Dterm = prev_Dterm*0.9+degree_Dterm*0.1
+
+                degree_output = degree_Pterm + degree_Iterm+degree_Dterm
+
+                prev_target = centerX
+                prev_Dterm = degree_Dterm
+
                 
     for idx, centroid in enumerate(centroids2): #---------------------------------Red-------------------------
         if stats2[idx][0] == 0 and stats2[idx][1] == 0:
